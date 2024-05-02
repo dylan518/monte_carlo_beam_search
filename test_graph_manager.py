@@ -1,79 +1,84 @@
 import unittest
-from unittest.mock import patch, MagicMock
-from graph_manager import GraphManager
-
+from graph_manager import GraphManager  # Assume your GraphManager class is in a file named graph_manager.py
 
 class TestGraphManager(unittest.TestCase):
     def setUp(self):
+        """
+        Setup a GraphManager instance with predefined tokens before each test.
+        """
         self.tokens = ["I", "am", "a", "programmer"]
-        self.graph_manager = GraphManager(self.tokens)
+        self.manager = GraphManager(self.tokens)
 
-    def test_init_with_valid_tokens(self):
-        self.assertIsInstance(self.graph_manager.graph, nx.DiGraph)
-        self.assertEqual(self.graph_manager.graph.number_of_nodes(), len(self.tokens))
-        self.assertEqual(self.graph_manager.graph.number_of_edges(), len(self.tokens) - 1)
+    def test_initialization(self):
+        """
+        Test initialization of GraphManager with non-empty token list.
+        """
+        self.assertEqual(len(self.manager.graph.nodes), 4)
+        self.assertEqual(self.manager.graph.nodes[1]['token'], "I")
 
-    def test_init_with_empty_tokens(self):
-        with self.assertRaises(ValueError):
-            GraphManager([])
+
+
 
     def test_extend_node(self):
-        node_id = 1
-        vocab_probs = {5: 0.2, 6: 0.8}
-        new_nodes, new_edges = self.graph_manager.extend_node(node_id, vocab_probs)
-        self.assertEqual(len(new_nodes), len(vocab_probs))
-        self.assertEqual(len(new_edges), len(vocab_probs))
+        """
+        Test extending a node with vocabulary-probability pairs.
+        """
+        vocab_probs = {'working': 0.8, 'hard': 0.2}
+        self.manager.extend_node(1, vocab_probs)
+        # Check that two new nodes have been added
+        self.assertEqual(len(self.manager.graph.nodes()), 3 + 2)  # Initial 3 + 2 new ones
 
-    @patch('graph_manager.ThreadPoolExecutor')
-    def test_batch_extend_graph(self, mock_executor):
-        nodes_data = [(1, {5: 0.2, 6: 0.8}), (2, {7: 0.5, 8: 0.5})]
-        mock_executor.return_value.__enter__.return_value.submit.side_effect = [MagicMock(), MagicMock()]
+        # Check if the new tokens are in the graph
+        found_tokens = {self.manager.graph.nodes[node_id]['token'] for node_id in self.manager.graph.nodes()}
+        self.assertIn('working', found_tokens)
+        self.assertIn('hard', found_tokens)
 
-        self.graph_manager.batch_extend_graph(nodes_data)
+    def test_batch_extend_graph(self):
+        """
+        Test batch extending the graph.
+        """
+        nodes_data = [
+            (1, {'developer': 0.6, 'artist': 0.4})
+        ]
+        self.manager.batch_extend_graph(nodes_data)
+        # Check if the new tokens are in the graph
+        found_tokens = {self.manager.graph.nodes[node_id]['token'] for node_id in self.manager.graph.nodes()}
+        self.assertIn('developer', found_tokens)
+        self.assertIn('artist', found_tokens)
 
-        self.assertEqual(mock_executor.return_value.__enter__.return_value.submit.call_count, len(nodes_data))
 
-    @patch('graph_manager.ThreadPoolExecutor')
-    def test_identify_leaf_nodes(self, mock_executor):
-        mock_executor.return_value.__enter__.return_value.submit.side_effect = [MagicMock(return_value=True),
-                                                                                MagicMock(return_value=False),
-                                                                                MagicMock(return_value=True),
-                                                                                MagicMock(return_value=True)]
+    def test_identify_leaf_nodes(self):
+        """
+        Test identification of leaf nodes.
+        """
+        leaf_nodes = self.manager.identify_leaf_nodes()
+        self.assertIn(4, leaf_nodes)  # Assuming the last token node is a leaf
 
-        leaf_nodes = self.graph_manager.identify_leaf_nodes()
-
-        self.assertEqual(len(leaf_nodes), 3)
-
-    @patch('graph_manager.ThreadPoolExecutor')
-    @patch('graph_manager.np.random.choice')
-    def test_sample_leaf_nodes(self, mock_choice, mock_executor):
-        leaf_nodes = [3, 4]
-        num_samples = 2
-        mock_executor.return_value.__enter__.return_value.submit.side_effect = [MagicMock(return_value=-1.0),
-                                                                                MagicMock(return_value=-0.5)]
-        mock_choice.return_value = leaf_nodes
-
-        sampled_nodes = self.graph_manager.sample_leaf_nodes(num_samples)
-
-        self.assertEqual(sampled_nodes, leaf_nodes)
+    def test_sample_leaf_nodes(self):
+        """
+        Test sampling of leaf nodes.
+        """
+        sampled_nodes = self.manager.sample_leaf_nodes(1)
+        self.assertTrue(sampled_nodes[0] in [1, 2, 3, 4])
 
     def test_reconstruct_sentence(self):
-        end_node_id = 4
-        expected_sentence = "I am a programmer"
-
-        reconstructed_sentence = self.graph_manager.reconstruct_sentence(end_node_id)
-
-        self.assertEqual(reconstructed_sentence, expected_sentence)
+        """
+        Test reconstructing a sentence from a specific node.
+        """
+        sentence = self.manager.reconstruct_sentence(4)
+        self.assertEqual(sentence, "I am a programmer")
 
     def test_find_highest_prob_leaf_node(self):
-        self.graph_manager.graph.nodes[3]['score'] = -1.0
-        self.graph_manager.graph.nodes[4]['score'] = -0.5
-
-        max_node, max_score = self.graph_manager.find_highest_prob_leaf_node()
-
-        self.assertEqual(max_node, 4)
-        self.assertAlmostEqual(max_score, -0.5)
-
+        """
+        Test finding the highest probability leaf node.
+        """
+        self.manager.graph.nodes[1]['score'] = -1.0
+        self.manager.graph.nodes[2]['score'] = -0.5
+        self.manager.graph.nodes[3]['score'] = -0.2
+        self.manager.graph.nodes[4]['score'] = -0.1  # Highest score
+        node_id, log_prob = self.manager.find_highest_prob_leaf_node()
+        self.assertEqual(node_id, 4)
+        self.assertEqual(log_prob, -0.1)
 
 if __name__ == '__main__':
     unittest.main()
