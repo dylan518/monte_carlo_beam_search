@@ -27,12 +27,17 @@ class GraphExtender:
         Args:
             node_ids (list of int): List of node IDs to extend.
         """
-        tokens = [self.graph_manager.graph.nodes[node_id]['token'] for node_id in node_ids]
-        token_probs = self.sequence_generator.generate_next_token_probs(torch.tensor(tokens))
+        sentences = []
+        for node_id in node_ids:
+            sentence = self.graph_manager.reconstruct_sentence(node_id)
+            sentences.append(sentence)
+
+        tokenized_sentences = self.sequence_generator.tokenize_string(sentences)
+        token_probs = self.sequence_generator.generate_next_token_probs(tokenized_sentences)
 
         for i in range(len(node_ids)):
             node_id = node_ids[i]
-            token_prob = token_probs[list(token_probs.keys())[i]]
+            token_prob = token_probs[i]
 
             sorted_probs = sorted(token_prob.items(), key=lambda x: x[1], reverse=True)[:self.bottleneck_size]
             vocab_probs = {token: prob for token, prob in sorted_probs}
