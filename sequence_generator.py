@@ -28,7 +28,7 @@ class SequenceGenerator:
     def generate_next_token_probs(self, sequences, top_n=5):
         """
         Takes in a batch of sequences and computes the probabilities of the next token for each sequence in the batch.
-        Returns a list of dictionaries for each sequence, where each dictionary has tokens as keys and probabilities as values.
+        Returns the top_n probabilities and their indices for each sequence.
         """
         # Ensure input is on the correct device
         sequences = sequences.to(self.device)
@@ -42,16 +42,6 @@ class SequenceGenerator:
         # Find the top_n probabilities and their indices
         top_probs, top_indices = torch.topk(probs, top_n, dim=1)
 
-        # Decode each index to its corresponding token and create the dictionary
-        results = []
-        for i in range(top_indices.shape[0]):
-            token_probs_dict = {}
-            for j in range(top_indices.shape[1]):
-                token = self.tokenizer.decode([top_indices[i, j].item()])
-                probability = top_probs[i, j].item()
-                token_probs_dict[token] = probability
-            results.append(token_probs_dict)
-
-        return results
+        return top_probs, top_indices
     
     

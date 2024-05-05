@@ -33,17 +33,20 @@ class GraphExtender:
             sentences.append(sentence)
 
         tokenized_sentences = self.sequence_generator.tokenize_string(sentences)
-        token_probs = self.sequence_generator.generate_next_token_probs(tokenized_sentences)
+        top_probs, top_indices = self.sequence_generator.generate_next_token_probs(tokenized_sentences, top_n=self.bottleneck_size)
 
+        # Process each node
         for i in range(len(node_ids)):
             node_id = node_ids[i]
-            token_prob = token_probs[i]
+            # Get top tokens and their probabilities for the current node
+            tokens = [self.tokenizer.decode([idx.item()]) for idx in top_indices[i]]
+            probabilities = top_probs[i].tolist()
 
-            sorted_probs = sorted(token_prob.items(), key=lambda x: x[1], reverse=True)[:self.bottleneck_size]
-            vocab_probs = {token: prob for token, prob in sorted_probs}
+            # Create a dictionary of token-probability pairs
+            token_prob_dict = {tokens[j]: probabilities[j] for j in range(len(tokens))}
 
             # Extend the node with the selected vocab probabilities
-            self.graph_manager.extend_node(node_id, vocab_probs)
+            self.graph_manager.extend_node(node_id, token_prob_dict)
     
     def run_extension_loop(self, num_iterations):
         """

@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 from graph_extender import GraphExtender
 from graph_manager import GraphManager
 from unittest.mock import call
-
 import torch
 
 class TestGraphExtender(unittest.TestCase):
