@@ -36,10 +36,9 @@ class GraphExtender:
         top_probs, top_indices = self.sequence_generator.generate_next_token_probs(tokenized_sentences, top_n=self.bottleneck_size)
 
         # Process each node
-        for i in range(len(node_ids)):
-            node_id = node_ids[i]
-            # Get top tokens and their probabilities for the current node
-            tokens = [self.tokenizer.decode([idx.item()]) for idx in top_indices[i]]
+        for i, node_id in enumerate(node_ids):
+            # Decode tokens using the method in SequenceGenerator
+            tokens = self.sequence_generator.decode_tokens(top_indices[i])
             probabilities = top_probs[i].tolist()
 
             # Create a dictionary of token-probability pairs

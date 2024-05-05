@@ -24,6 +24,18 @@ class SequenceGenerator:
         Tokenizes a string using the model's tokenizer.
         """
         return self.tokenizer(string, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+    
+    def decode_tokens(self, indices):
+        """
+        Decodes a list of token indices into tokens using the tokenizer.
+        
+        Args:
+            indices (list of int or tensor): List or tensor of token indices to decode.
+
+        Returns:
+            list of str: Decoded tokens.
+        """
+        return [self.tokenizer.decode([idx.item()]) for idx in indices]
 
     def generate_next_token_probs(self, sequences, top_n=5):
         """
