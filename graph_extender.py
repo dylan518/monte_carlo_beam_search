@@ -3,7 +3,7 @@ from sequence_generator import SequenceGenerator
 from graph_manager import GraphManager
 
 class GraphExtender:
-    def __init__(self):
+    def __init__(self,bottleneck_size=50,batch_size=128):
         self.sequence_generator = SequenceGenerator()
         self.bottleneck_size = 50  # Number of top probable tokens to consider
         self.batch_size = 128  # Number of nodes to extend in parallel
@@ -90,3 +90,6 @@ class GraphExtender:
     def main(self, string, iterations):
         self.build_graph(string)
         self.run_extension_loop(iterations)
+        best_result=self.graph_manager.find_highest_prob_leaf_node()
+        self.graph_manager.reconstruct_sentence(best_result[0])
+        return best_result
