@@ -4,7 +4,7 @@ from graph_manager import GraphManager
 
 class GraphExtender:
     def __init__(self):
-        #self.sequence_generator = SequenceGenerator()
+        self.sequence_generator = SequenceGenerator()
         self.bottleneck_size = 50  # Number of top probable tokens to consider
         self.batch_size = 128  # Number of nodes to extend in parallel
         self.graph_manager = None  # Initialize graph_manager to None
