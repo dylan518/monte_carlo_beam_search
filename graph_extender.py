@@ -4,7 +4,7 @@ from graph_manager import GraphManager
 
 class GraphExtender:
     def __init__(self):
-        self.sequence_generator = SequenceGenerator()
+        #self.sequence_generator = SequenceGenerator()
         self.bottleneck_size = 50  # Number of top probable tokens to consider
         self.batch_size = 128  # Number of nodes to extend in parallel
         self.graph_manager = None  # Initialize graph_manager to None
@@ -30,9 +30,11 @@ class GraphExtender:
         tokens = [self.graph_manager.graph.nodes[node_id]['token'] for node_id in node_ids]
         token_probs = self.sequence_generator.generate_next_token_probs(torch.tensor(tokens))
 
-        for idx, node_id in enumerate(node_ids):
-            # Get the sorted token probabilities and apply the bottleneck
-            sorted_probs = sorted(token_probs[idx].items(), key=lambda x: x[1], reverse=True)[:self.bottleneck_size]
+        for i in range(len(node_ids)):
+            node_id = node_ids[i]
+            token_prob = token_probs[list(token_probs.keys())[i]]
+
+            sorted_probs = sorted(token_prob.items(), key=lambda x: x[1], reverse=True)[:self.bottleneck_size]
             vocab_probs = {token: prob for token, prob in sorted_probs}
 
             # Extend the node with the selected vocab probabilities
