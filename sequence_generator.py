@@ -23,19 +23,31 @@ class SequenceGenerator:
         """
         Tokenizes a string using the model's tokenizer.
         """
-        return self.tokenizer(string, return_tensors="pt", padding=True, truncation=True)["input_ids"]
+        return self.tokenizer(string, return_tensors="pt", padding=True, truncation=True, return_attention_mask=False)["input_ids"]
     
-    def decode_tokens(self, indices):
-        """
-        Decodes a list of token indices into tokens using the tokenizer.
-        
-        Args:
-            indices (list of int or tensor): List or tensor of token indices to decode.
+    def decode_token_tensor(self,token_indices_tensor):
+      """
+      Decodes a tensor of token indices into their corresponding token strings. This function
+      is designed to handle tensors that might be on the GPU.
 
-        Returns:
-            list of str: Decoded tokens.
-        """
-        return [self.tokenizer.decode([idx.item()]) for idx in indices]
+      Args:
+          token_indices_tensor (torch.Tensor): Tensor of token indices, possibly on GPU.
+          tokenizer: Tokenizer object with a convert_ids_to_tokens method.
+
+      Returns:
+          list of str: List of decoded tokens.
+      """
+      # Move the tensor to the CPU if it's on the GPU
+      if token_indices_tensor.is_cuda:
+          token_indices_tensor = token_indices_tensor.cpu()
+      
+      # Convert the tensor to a list of integers
+      token_indices_list = token_indices_tensor.tolist()
+
+      # Decode each token index to a token string using the tokenizer
+      decoded_tokens = [self.tokenizer.convert_ids_to_tokens(index) for index in token_indices_list]
+
+      return decoded_tokens
 
     def generate_next_token_probs(self, sequences, top_n=5):
         """
@@ -56,4 +68,25 @@ class SequenceGenerator:
 
         return top_probs, top_indices
     
+    def reconstruct_sentence(tokens):
+      """
+      Reconstructs a sentence from tokens encoded with special characters like 'Ġ'.
+      
+      Args:
+          tokens (list of str): The list of tokens to be reconstructed into a sentence.
+
+      Returns:
+          str: The reconstructed sentence.
+      """
+      sentence = ""
+      for token in tokens:
+          if token.startswith('Ġ'):
+              if sentence:  # Add space before if it's not the first token
+                  sentence += ' '
+              sentence += token[1:]  # Add the token without 'Ġ'
+          else:
+              sentence += token  # Add other tokens directly
+      return sentence
     
+    
+

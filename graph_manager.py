@@ -1,3 +1,4 @@
+
 import networkx as nx
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,6 +14,7 @@ class GraphManager:
         self.graph = nx.DiGraph()
         if not tokens:
             raise ValueError("Tokens list cannot be empty.")
+        
         self._build_graph(tokens)
         
     def _build_graph(self, tokens):
@@ -25,7 +27,7 @@ class GraphManager:
         for i in range(len(tokens)):
             node_id = i + 1
             token = tokens[i]
-            self.graph.add_node(node_id, token=token, score=99, prev_node=None)
+            self.graph.add_node(node_id, token=token, score=0.0001, prev_node=None)
 
             if i > 0:
                 prev_node_id = i
@@ -113,24 +115,32 @@ class GraphManager:
         return sampled_nodes.tolist()
     
     def reconstruct_sentence(self, end_node_id):
-        """
-        Reconstructs a sentence by tracing back from the specified end node to the original parent node in the DAG.
-        
-        Args:
-            end_node_id (int): The ID of the end node from which to start tracing back.
-        
-        Returns:
-            str: The reconstructed sentence from the graph.
-        """
-        sequence = []
-        current_node_id = end_node_id
-        while current_node_id is not None:
-            node = self.graph.nodes[current_node_id]
-            sequence.append(node['token'])
-            current_node_id = node.get('prev_node')  # Get the previous node
+      """
+      Reconstructs a sentence by tracing back from the specified end node to the original parent node in the DAG,
+      carefully managing spaces for tokens that represent parts of words or whole words.
+      
+      Args:
+          end_node_id (int): The ID of the end node from which to start tracing back.
+      
+      Returns:
+          str: The reconstructed sentence from the graph.
+      """
+      sequence = []
+      current_node_id = end_node_id
+      while current_node_id is not None:
+          node = self.graph.nodes[current_node_id]
+          token = node['token']
+          if token.startswith('Ġ'):
+              token = ' ' + token[1:]  # Add a space before the token if it starts with 'Ġ'
+          sequence.append(token)
+          current_node_id = node.get('prev_node')  # Get the previous node
 
-        # Reverse the sequence to start from the root and convert tokens back to string
-        return ' '.join(map(str, sequence[::-1]))
+      # Reverse the sequence to start from the root and construct the sentence
+      # Concatenate directly since spaces are managed in the token processing step
+      sentence = ''.join(sequence[::-1])
+
+      return sentence
+
     
     def find_highest_prob_leaf_node(self):
         """
@@ -153,6 +163,27 @@ class GraphManager:
 
         return (max_node, max_score) if max_node is not None else (None, None)
 
+    def get_node_content(self, node_id):
+        """
+        Retrieve the content (tokens or sentence) associated with a node.
+
+        Args:
+            node_id (int): The ID of the node.
+
+        Returns:
+            str: The content of the node.
+        """
+        # Assuming each node has a 'content' attribute or similar
+        return {"score":self.graph.nodes[node_id]['score'],"token":self.graph.nodes[node_id]['token']}
+
+    def print_graph(self):
+        """
+        Print all nodes in the graph with their content.
+        """
+        for node_id in self.graph.nodes:
+            content = self.get_node_content(node_id)
+            print(f"Node {node_id}: {content}")
+
 
 
 
@@ -160,4 +191,6 @@ class GraphManager:
 # Example usage assuming necessary classes and graph initialization
 if __name__ == "__main__":
     graph=GraphManager(["I", "am", "a", "programmer"])
+
+
 

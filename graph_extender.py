@@ -16,8 +16,9 @@ class GraphExtender:
         Args:
             string (str): The input string to tokenize and build the graph from.
         """
-        tokens = self.sequence_generator.tokenize_string(string)
-        tokens = tokens.squeeze().tolist()  # Convert tensor to list of token IDs
+        tokens_tensor = self.sequence_generator.tokenize_string(string)
+        tokens=self.sequence_generator.decode_token_tensor(tokens_tensor)
+        tokens = tokens[0]  # Convert tensor to list of token IDs
         self.graph_manager = GraphManager(tokens)
 
     def extend_graph(self, node_ids):
@@ -38,7 +39,7 @@ class GraphExtender:
         # Process each node
         for i, node_id in enumerate(node_ids):
             # Decode tokens using the method in SequenceGenerator
-            tokens = self.sequence_generator.decode_tokens(top_indices[i])
+            tokens = self.sequence_generator.decode_token_tensor(top_indices[i])
             probabilities = top_probs[i].tolist()
 
             # Create a dictionary of token-probability pairs
@@ -89,7 +90,3 @@ class GraphExtender:
     def main(self, string, iterations):
         self.build_graph(string)
         self.run_extension_loop(iterations)
-
-
-        
-
