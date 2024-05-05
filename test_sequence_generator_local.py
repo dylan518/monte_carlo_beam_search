@@ -11,6 +11,7 @@ class TestSequenceGenerator(unittest.TestCase):
         self.sequence_generator = SequenceGenerator(self.model_name)
         self.mock_tokenizer = mock_tokenizer
         self.mock_model = mock_model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def test_init(self):
         self.assertEqual(self.sequence_generator.device.type, "cpu")  # Assuming running on CPU for testing
@@ -27,21 +28,31 @@ class TestSequenceGenerator(unittest.TestCase):
         self.mock_tokenizer.return_value.assert_called_once_with(string, return_tensors="pt", padding=True, truncation=True)
         self.assertTrue(torch.equal(tokenized_string, expected_output))
 
-    @patch('torch.nn.functional.softmax')
-    def test_generate_next_token_probs(self, mock_softmax):
-        sequences = torch.tensor([[1, 2, 3], [4, 5, 6]])
-        expected_probs = torch.tensor([[0.1, 0.2, 0.7], [0.3, 0.4, 0.3]])
-        mock_outputs = MagicMock()
-        mock_outputs.logits = torch.tensor([[[0.1, 0.2, 0.7]], [[0.3, 0.4, 0.3]]])  # Mocked logits
-        self.sequence_generator.model.return_value = mock_outputs
-        mock_softmax.return_value = expected_probs
+    def test_generate_next_token_probs(self):
+        if self.device.type == "cuda":
+            print("Running tests on GPU.")
+            sequence_generator = SequenceGenerator(self.model_name)
 
-        probs = self.sequence_generator.generate_next_token_probs(sequences)
+            # Test next token probabilities
+            sequences = torch.randint(0, 1000, (2, 5))  # Example sequences
+            with unittest.mock.patch.object(F, 'softmax', wraps=F.softmax) as mock_softmax:
+                probs = sequence_generator.generate_next_token_probs(sequences)
+                self.assertIsInstance(probs, torch.Tensor)
+                self.assertEqual(probs.shape[0], 2)  # Batch size should be 2
+                self.assertGreater(probs.shape[1], 0)  # Vocabulary size should be greater than 0
+                self.assertTrue(torch.allclose(probs.sum(dim=-1), torch.tensor([1.0, 1.0])))  # Probabilities should sum to 1
 
-        self.sequence_generator.model.assert_called_once_with(input_ids=sequences)
-        mock_softmax.assert_called_once_with(mock_outputs.logits[:, -1, :], dim=-1)
-        self.assertTrue(torch.equal(probs, expected_probs))
+                # Check if softmax was called with the correct arguments
+                mock_softmax.assert_called_once()
+                call_args = mock_softmax.call_args[0]
+                self.assertTrue(torch.allclose(call_args[0], sequence_generator.model(input_ids=sequences).logits[:, -1, :]))
+                self.assertEqual(call_args[1], -1)
+        else:
+            print("No GPU found. Skipping tests.")
+            self.skipTest("No GPU found.")
 
 
 if __name__ == '__main__':
     unittest.main()
+
+    

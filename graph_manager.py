@@ -48,6 +48,8 @@ class GraphManager:
             new_node_id = max(self.graph.nodes, default=0) + 1  # Ensure unique node ID
             new_nodes[new_node_id] = {'token': token, 'score': new_score, 'prev_node': node_id}
             new_edges.append((node_id, new_node_id, prob))
+            self.graph.add_edge(node_id, new_node_id)
+            self.graph.add_node(new_node_id, token=token, score=new_score, prev_node=node_id)
         return new_nodes, new_edges
 
 
