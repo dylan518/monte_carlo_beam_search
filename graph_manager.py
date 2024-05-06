@@ -4,48 +4,68 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 
-import networkx as nx
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-import networkx as nx
-import math
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class GraphManager:
     def __init__(self, tokens):
         self.graph = nx.DiGraph()
-        self.leaf_nodes = {}  # Initialize the dictionary for caching leaf node data
+        self.leaf_nodes = {}
+        self.leaf_parent_cache = {}
+        self.original_leaf_nodes = set()  # Added set to track original leaf nodes
         if not tokens:
             raise ValueError("Tokens list cannot be empty.")
+        self.current_id = 0
         self._build_graph(tokens)
-        self.current_id=0
         
+
     def _build_graph(self, tokens):
         prev_node_id = None
         for i, token in enumerate(tokens):
-            node_id = i + 1
+            node_id = self.current_id
+            self.current_id += 1
             self.graph.add_node(node_id, token=token, score=0.0001, prev_node=prev_node_id)
             if prev_node_id is not None:
                 self.graph.add_edge(prev_node_id, node_id)
             prev_node_id = node_id
-            self.leaf_nodes[node_id] = self.graph.nodes[node_id]  # Cache the entire node data
+            self.leaf_nodes[node_id] = self.graph.nodes[node_id]
         if len(tokens) > 1:
-            self.leaf_nodes.pop(1, None)  # The first node is not a leaf if there is more than one node
-
+            self.leaf_nodes.pop(1, None)
+        self.original_leaf_nodes = set(self.leaf_nodes.keys())
     def extend_node(self, node_id, vocab_probs):
         current_score = self.graph.nodes[node_id]['score']
         if node_id in self.leaf_nodes:
-            del self.leaf_nodes[node_id]  # Remove the current node from leaf nodes cache
+            del self.leaf_nodes[node_id]
+            if node_id not in self.original_leaf_nodes:  # Check if the node is not an original leaf node
+                del self.leaf_parent_cache[node_id]
         new_nodes = {}
         for token, prob in vocab_probs.items():
             new_score = current_score + math.log(prob)
             new_node_id = self.current_id
-            self.current_id+=1
+            self.current_id += 1
             new_node_data = {'token': token, 'score': new_score, 'prev_node': node_id}
             self.graph.add_node(new_node_id, **new_node_data)
             self.graph.add_edge(node_id, new_node_id)
-            self.leaf_nodes[new_node_id] = new_node_data  # Cache new node data
+            self.leaf_nodes[new_node_id] = new_node_data
+            if node_id not in self.original_leaf_nodes:  # Check if the node is not an original leaf node
+                self.leaf_parent_cache[new_node_id] = (node_id, token)
+
+    def reconstruct_sentence(self, end_node_id):
+        sequence = []
+        current_node_id = end_node_id
+        while current_node_id is not None:
+            if current_node_id in self.leaf_parent_cache:
+                parent_id, token = self.leaf_parent_cache[current_node_id]
+                sequence.append(token)
+                current_node_id = parent_id
+            else:
+                node = self.graph.nodes[current_node_id]
+                token = node['token']
+                if token.startswith('Ġ'):
+                    token = ' ' + token[1:]
+                sequence.append(token)
+                current_node_id = node.get('prev_node')
+
+        sentence = ''.join(sequence[::-1])
+        return sentence
 
     def identify_leaf_nodes(self):
         return list(self.leaf_nodes.keys())  # Return the current set of leaf node IDs
@@ -66,32 +86,23 @@ class GraphManager:
         return sampled_nodes.tolist()
     
     def reconstruct_sentence(self, end_node_id):
-        """
-        Reconstructs a sentence by tracing back from the specified end node to the original parent node in the DAG,
-        carefully managing spaces for tokens that represent parts of words or whole words.
-        
-        Args:
-            end_node_id (int): The ID of the end node from which to start tracing back.
-        
-        Returns:
-            str: The reconstructed sentence from the graph.
-        """
         sequence = []
         current_node_id = end_node_id
         while current_node_id is not None:
-            node = self.graph.nodes[current_node_id]
-            token = node['token']
-            if token.startswith('Ġ'):
-                token = ' ' + token[1:]  # Add a space before the token if it starts with 'Ġ'
-            sequence.append(token)
-            current_node_id = node.get('prev_node')  # Get the previous node
+            if current_node_id in self.leaf_parent_cache:
+                parent_id, token = self.leaf_parent_cache[current_node_id]
+                sequence.append(token)
+                current_node_id = parent_id
+            else:
+                node = self.graph.nodes[current_node_id]
+                token = node['token']
+                if token.startswith('Ġ'):
+                    token = ' ' + token[1:]
+                sequence.append(token)
+                current_node_id = node.get('prev_node')
 
-        # Reverse the sequence to start from the root and construct the sentence
-        # Concatenate directly since spaces are managed in the token processing step
         sentence = ''.join(sequence[::-1])
-
         return sentence
-
     
     def find_highest_prob_leaf_node(self):
         """
