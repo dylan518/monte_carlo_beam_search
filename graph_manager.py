@@ -19,6 +19,7 @@ class GraphManager:
         if not tokens:
             raise ValueError("Tokens list cannot be empty.")
         self._build_graph(tokens)
+        self.current_id=0
         
     def _build_graph(self, tokens):
         prev_node_id = None
@@ -39,7 +40,8 @@ class GraphManager:
         new_nodes = {}
         for token, prob in vocab_probs.items():
             new_score = current_score + math.log(prob)
-            new_node_id = max(self.graph.nodes, default=0) + 1
+            new_node_id = self.current_id
+            self.current_id+=1
             new_node_data = {'token': token, 'score': new_score, 'prev_node': node_id}
             self.graph.add_node(new_node_id, **new_node_data)
             self.graph.add_edge(node_id, new_node_id)

@@ -3,7 +3,7 @@ from graph_manager import GraphManager  # Ensure your GraphManager is correctly 
 
 class TestGraphManager(unittest.TestCase):
     def setUp(self):
-        self.tokens = ["I", "am", "a", "programmer"]
+        self.tokens = ["ĠI", "Ġam", "Ġa", "Ġprogrammer"]
         self.manager = GraphManager(self.tokens)
 
     def test_extend_node(self):
@@ -11,21 +11,21 @@ class TestGraphManager(unittest.TestCase):
         Test extending a node and check the correct tokens and number of nodes are added.
         """
         node_id = 4  # Extending the last initial node
-        vocab_probs = {'working': 0.8, 'hard': 0.2}
+        vocab_probs = {'Ġworking': 0.8, 'Ġhard': 0.2}
         self.manager.extend_node(node_id, vocab_probs)
         self.assertEqual(len(self.manager.graph.nodes), 6)  # Initial 4 + 2 new ones
 
         # Collect all tokens in the graph to ensure 'working' and 'hard' are added
         tokens_in_graph = [self.manager.graph.nodes[node]['token'] for node in self.manager.graph.nodes()]
-        self.assertIn('working', tokens_in_graph)
-        self.assertIn('hard', tokens_in_graph)
+        self.assertIn('Ġworking', tokens_in_graph)
+        self.assertIn('Ġhard', tokens_in_graph)
 
     def test_batch_extend_graph(self):
         """
         Test batch extending the graph and verify the correct tokens are added.
         """
         nodes_data = [
-            (4, {'developer': 0.6, 'artist': 0.4})  # Extending node 4
+            (4, {'Ġdeveloper': 0.6, 'Ġartist': 0.4})  # Extending node 4
         ]
         self.manager.batch_extend_graph(nodes_data)
         
@@ -54,7 +54,7 @@ class TestGraphManager(unittest.TestCase):
         """
         Ensure the correct leaf node is identified as having the highest log probability.
         """
-        self.manager.extend_node(4, {'new_token': 0.5})  # Extend node 4
+        self.manager.extend_node(4, {'Ġnew_token': 0.5})  # Extend node 4
         self.manager.graph.nodes[5]['score'] = -0.1  # Set a high score
         node_id, log_prob = self.manager.find_highest_prob_leaf_node()
         self.assertEqual(len(self.manager.graph.nodes), 5)
