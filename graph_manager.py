@@ -7,12 +7,14 @@ class BeamSearchGraph:
         self.best_node = None
         self.top_k = top_k
 
-    def build_graph(self, initial_tokens, initial_score=-999):
+    def build_graph(self, initial_tokens, initial_score=-1):
         initial_node = {
             'depth': 0,
             'tokens': initial_tokens,
             'score': initial_score
         }
+        if not initial_node['tokens']:
+            raise ValueError("Initial tokens must not be empty.")
         self.add_nodes([initial_node])
     
     def add_nodes(self, nodes):
@@ -43,8 +45,7 @@ class BeamSearchGraph:
         scores = np.array(list(self.leaf_nodes.keys()))
         probabilities = np.exp(scores)
 
-        # Normalize probabilities
-        probabilities /= np.sum(probabilities)
+
 
         # Perform weighted sampling
         sampled_indices = np.random.choice(len(scores), size=n_samples, replace=False, p=probabilities)
@@ -57,6 +58,7 @@ class BeamSearchGraph:
             sampled_nodes.append(node)
 
         return sampled_nodes
+    
     def print_graph(self, n_nodes):
         print(f"Best node: {self.best_node}")
         print(f"Top {n_nodes} leaf nodes:")
