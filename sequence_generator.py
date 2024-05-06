@@ -48,7 +48,11 @@ class SequenceGenerator:
       decoded_tokens = [self.tokenizer.convert_ids_to_tokens(index) for index in token_indices_list]
 
       return decoded_tokens
-
+    
+    def token_to_string(self, token_indices_list):
+        decoded_string=[self.tokenizer.convert_ids_to_tokens(index) for index in token_indices_list]
+        return self.reconstruct_sentence(decoded_string)
+    
     def generate_next_token_probs(self, sequences, top_n=5):
         """
         Takes in a batch of sequences and computes the probabilities of the next token for each sequence in the batch.

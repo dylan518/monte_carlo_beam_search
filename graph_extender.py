@@ -55,6 +55,10 @@ class GraphExtender:
 
         batched_token_ids = torch.tensor(batched_token_ids, dtype=torch.long)
 
+        # Add batch size dimension if needed
+        if batched_token_ids.ndim == 1:
+            batched_token_ids = batched_token_ids.unsqueeze(0)
+
         top_probs_list, top_indices_list = self.sequence_generator.generate_next_token_probs(batched_token_ids, top_n=self.bottleneck_size)
 
         # Move the results back to CPU for further processing
@@ -103,6 +107,6 @@ class GraphExtender:
     def main(self, string, iterations):
         self.build_graph(string)
         self.run_extension_loop(iterations)
-        best_result=self.graph_manager.find_highest_prob_leaf_node()
-        self.sequence_generator.decode_token_tensor(best_result)
+        best_result=self.find_highest_prob_leaf_node()
+        self.sequence_generator.token_to_string(best_result)
         return best_result
