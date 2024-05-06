@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 from graph_extender import GraphExtender
-from graph_manager import GraphManager
+from graph_manager import BeamSearchGraph
 from unittest.mock import call
 import torch
 
@@ -24,14 +24,14 @@ class TestGraphExtender(unittest.TestCase):
         self.extender.sequence_generator.tokenize_string.assert_called_once_with(self.input_string)
 
         # Check if the graph_manager is initialized correctly
-        self.assertIsInstance(self.extender.graph_manager, GraphManager)
+        self.assertIsInstance(self.extender.graph_manager, BeamSearchGraph)
         self.assertListEqual(list(self.extender.graph_manager.graph.nodes(data='token')),
                              [(1, 1), (2, 2), (3, 3), (4, 4), (5, 5)])
 
     @patch('graph_manager.GraphManager.extend_node')
     def test_extend_graph(self, mock_extend_node):
         # Create an actual graph with nodes
-        graph_manager = GraphManager([10, 20, 30])
+        graph_manager = BeamSearchGraph([10, 20, 30])
         self.extender.graph_manager = graph_manager
 
         # Mock the generate_next_token_probs method to return fixed probabilities

@@ -52,6 +52,8 @@ class GraphExtender:
         for node in nodes:
             token_ids = node["tokens"]
             batched_token_ids.append(token_ids)
+        if not batched_token_ids:
+            raise ValueError("No nodes to extend.")
 
         batched_token_ids = torch.tensor(batched_token_ids, dtype=torch.long)
 
