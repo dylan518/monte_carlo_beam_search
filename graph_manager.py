@@ -30,12 +30,14 @@ class GraphManager:
         if len(tokens) > 1:
             self.leaf_nodes.pop(1, None)
         self.original_leaf_nodes = set(self.leaf_nodes.keys())
+
     def extend_node(self, node_id, vocab_probs):
         current_score = self.graph.nodes[node_id]['score']
         if node_id in self.leaf_nodes:
             del self.leaf_nodes[node_id]
             if node_id not in self.original_leaf_nodes:  # Check if the node is not an original leaf node
-                del self.leaf_parent_cache[node_id]
+                if node_id in self.leaf_parent_cache:
+                    del self.leaf_parent_cache[node_id]
         new_nodes = {}
         for token, prob in vocab_probs.items():
             new_score = current_score + math.log(prob)
