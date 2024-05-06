@@ -1,13 +1,19 @@
+
+
 import torch
 from sequence_generator import SequenceGenerator
-from graph_manager import GraphManager
+from graph_manager import BeamSearchGraph
+import math
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+
 
 class GraphExtender:
     def __init__(self,bottleneck_size=50,batch_size=128):
         self.sequence_generator = SequenceGenerator()
         self.bottleneck_size = 50  # Number of top probable tokens to consider
         self.batch_size = 128  # Number of nodes to extend in parallel
-        self.graph_manager = None  # Initialize graph_manager to None
+        self.graph_manager = BeamSearchGraph(top_k=self.bottleneck_size)  # Initialize graph_manager to None        
 
     def build_graph(self, string):
         """
@@ -16,37 +22,60 @@ class GraphExtender:
         Args:
             string (str): The input string to tokenize and build the graph from.
         """
-        tokens_tensor = self.sequence_generator.tokenize_string(string)
-        tokens=self.sequence_generator.decode_token_tensor(tokens_tensor)
-        tokens = tokens[0]  # Convert tensor to list of token IDs
-        self.graph_manager = GraphManager(tokens)
+        token_tensor = self.sequence_generator.tokenize_string(string)
+        tokens = token_tensor[0]  # Convert tensor to list of token IDs
+        self.graph_manager = BeamSearchGraph(tokens)
 
-    def extend_graph(self, node_ids):
+    def process_node(node, top_probs, top_indices):
+        new_nodes = OrderedDict()
+        for top_prob, top_index in zip(top_probs, top_indices):
+            score = node["score"] + math.log(top_prob.item())
+            new_node = {
+                "depth": node["depth"] + 1,
+                "tokens": node["tokens"] + [top_index.item()],
+                "score": score
+            }
+            new_nodes[score] = new_node
+        return new_nodes
+    
+
+
+    def extend_graph(self, nodes):
         """
-        Extends the graph based on the given node IDs by generating and applying the top probable tokens.
+        Extends the graph based on the given nodes by generating and applying the top probable tokens.
 
         Args:
-            node_ids (list of int): List of node IDs to extend.
+            nodes (list of dict): List of node dictionaries to extend.
         """
-        sentences = []
-        for node_id in node_ids:
-            sentence = self.graph_manager.reconstruct_sentence(node_id)
-            sentences.append(sentence)
+        # Batch the token IDs together
+        batched_token_ids = []
+        for node in nodes:
+            token_ids = node["tokens"]
+            batched_token_ids.append(token_ids)
 
-        tokenized_sentences = self.sequence_generator.tokenize_string(sentences)
-        top_probs, top_indices = self.sequence_generator.generate_next_token_probs(tokenized_sentences, top_n=self.bottleneck_size)
+        batched_token_ids = torch.tensor(batched_token_ids, dtype=torch.long)
 
-        # Process each node
-        for i, node_id in enumerate(node_ids):
-            # Decode tokens using the method in SequenceGenerator
-            tokens = self.sequence_generator.decode_token_tensor(top_indices[i])
-            probabilities = top_probs[i].tolist()
+        top_probs_list, top_indices_list = self.sequence_generator.generate_next_token_probs(batched_token_ids, top_n=self.bottleneck_size)
 
-            # Create a dictionary of token-probability pairs
-            token_prob_dict = {tokens[j]: probabilities[j] for j in range(len(tokens))}
+        # Move the results back to CPU for further processing
+        top_probs_list = [top_probs.cpu() for top_probs in top_probs_list]
+        top_indices_list = [top_indices.cpu() for top_indices in top_indices_list]
 
-            # Extend the node with the selected vocab probabilities
-            self.graph_manager.extend_node(node_id, token_prob_dict)
+        # Use multithreading to process nodes in parallel
+        with ThreadPoolExecutor() as executor:
+            futures = []
+            for node, top_probs, top_indices in zip(nodes, top_probs_list, top_indices_list):
+                future = executor.submit(self.process_node, node, top_probs, top_indices)
+                futures.append(future)
+
+            # Gather the results from the futures
+            new_nodes = OrderedDict()
+            for future in futures:
+                node_results = future.result()
+                new_nodes.update(node_results)
+
+        self.graph_manager.add_nodes(new_nodes)
+                
     
     def run_extension_loop(self, num_iterations):
         """
@@ -57,11 +86,7 @@ class GraphExtender:
         """
         for _ in range(num_iterations):
             # Identify the leaf nodes
-            leaf_nodes = self.graph_manager.identify_leaf_nodes()
-
-            # Sample a subset of leaf nodes
-            num_samples = min(len(leaf_nodes), self.batch_size)
-            sampled_nodes = self.graph_manager.sample_leaf_nodes(num_samples)
+            sampled_nodes = self.graph_manager.sample_nodes(self.batch_size)
 
             # Extend the sampled nodes
             self.extend_graph(sampled_nodes)
@@ -73,23 +98,11 @@ class GraphExtender:
         Returns:
             tuple: A tuple containing the node ID and its log probability.
         """
-        max_node = None
-        max_score = float('-inf')  # Start with the lowest possible log probability
-
-        # Check if a node is a leaf node (no outgoing edges)
-        leaf_nodes = [node for node in self.graph.nodes() if self.graph.out_degree(node) == 0]
-
-        for node_id in leaf_nodes:
-            node_score = self.graph.nodes[node_id]['score']
-            if node_score > max_score:
-                max_score = node_score
-                max_node = node_id
-
-        return (max_node, max_score) if max_node is not None else (None, None)
+        return self.graph_manager.best_node["tokens"]
         
     def main(self, string, iterations):
         self.build_graph(string)
         self.run_extension_loop(iterations)
         best_result=self.graph_manager.find_highest_prob_leaf_node()
-        self.graph_manager.reconstruct_sentence(best_result[0])
+        self.sequence_generator.decode_token_tensor(best_result)
         return best_result

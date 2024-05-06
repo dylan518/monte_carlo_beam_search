@@ -1,66 +1,74 @@
 import unittest
-from graph_manager import GraphManager  # Ensure your GraphManager is correctly imported
+import numpy as np
+from collections import OrderedDict
+from graph_manager import BeamSearchGraph
 
-class TestGraphManager(unittest.TestCase):
+class TestBeamSearchGraph(unittest.TestCase):
     def setUp(self):
-        self.tokens = ["I", "Ġam", "Ġa", "Ġprogrammer"]
-        self.manager = GraphManager(self.tokens)
+        self.top_k = 3
+        self.graph = BeamSearchGraph(top_k=self.top_k)
 
-    def test_extend_node(self):
-        """
-        Test extending a node and check the correct tokens and number of nodes are added.
-        """
-        node_id = 3  # Extending the last initial node
-        vocab_probs = {'Ġworking': 0.8, 'Ġhard': 0.2}
-        self.manager.extend_node(node_id, vocab_probs)
-        self.assertEqual(len(self.manager.graph.nodes), 6)  # Initial 4 + 2 new ones
+    def test_build_graph(self):
+        initial_tokens = ['The', 'quick', 'brown', 'fox']
+        initial_score = -10.0
+        self.graph.build_graph(initial_tokens, initial_score)
 
-        # Collect all tokens in the graph to ensure 'working' and 'hard' are added
-        tokens_in_graph = [self.manager.graph.nodes[node]['token'] for node in self.manager.graph.nodes()]
-        self.assertIn('Ġworking', tokens_in_graph)
-        self.assertIn('Ġhard', tokens_in_graph)
-    def test_identify_leaf_nodes(self):
-        """
-        Test identifying leaf nodes after extending the graph.
-        """
-        self.manager.extend_node(3, {'new_token': 0.5})  # Extend node 4 to create a new leaf
-        leaf_nodes = self.manager.identify_leaf_nodes()
-        self.assertIn(4, leaf_nodes)  # New leaf node ID should be 5
+        self.assertEqual(len(self.graph.leaf_nodes), 1)
+        self.assertIsNotNone(self.graph.best_node)
+        self.assertEqual(self.graph.best_node['score'], initial_score)
+        self.assertEqual(self.graph.best_node['tokens'], initial_tokens)
 
-    def test_reconstruct_sentence(self):
-        """
-        Test reconstructing the sentence from the extended node.
-        """
-        self.manager.extend_node(3, {'Ġnew_token': 0.5})
-        sentence = self.manager.reconstruct_sentence(4)  # New node ID 5
-        self.assertEqual(sentence, "I am a programmer new_token")
-
-    def test_find_highest_prob_leaf_node(self):
-        """
-        Ensure the correct leaf node is identified as having the highest log probability.
-        """
-        self.manager.extend_node(3, {'Ġnew_token': 0.5})  # Extend node 4
-        self.manager.graph.nodes[4]['score'] = -0.1  # Set a high score
-        node_id, log_prob = self.manager.find_highest_prob_leaf_node()
-        self.assertEqual(len(self.manager.graph.nodes), 5)
-        self.assertEqual(node_id, 4)
-        self.assertEqual(log_prob, -0.1)
-
-'''
-    def test_batch_extend_graph(self):
-        """
-        Test batch extending the graph and verify the correct tokens are added.
-        """
-        nodes_data = [
-            (4, {'Ġdeveloper': 0.6, 'Ġartist': 0.4})  # Extending node 4
+    def test_add_nodes(self):
+        nodes = [
+            {'depth': 1, 'tokens': ['The', 'quick'], 'score': -5.0},
+            {'depth': 1, 'tokens': ['The', 'swift'], 'score': -7.0},
+            {'depth': 1, 'tokens': ['The', 'fast'], 'score': -6.0},
+            {'depth': 1, 'tokens': ['The', 'slow'], 'score': -8.0}
         ]
-        self.manager.batch_extend_graph(nodes_data)
-        
-        # Collect all tokens in the graph to ensure 'developer' and 'artist' are added
-        tokens_in_graph = [self.manager.graph.nodes[node]['token'] for node in self.manager.graph.nodes()]
-        self.assertIn('developer', tokens_in_graph)
-        self.assertIn('artist', tokens_in_graph)
-'''
+        self.graph.add_nodes(nodes)
+
+        self.assertEqual(len(self.graph.leaf_nodes), self.top_k)
+        self.assertEqual(self.graph.best_node['score'], -5.0)
+        self.assertEqual(self.graph.best_node['tokens'], ['The', 'quick'])
+
+    def test_sample_nodes(self):
+        nodes = [
+            {'depth': 1, 'tokens': ['The', 'quick'], 'score': -5.0},
+            {'depth': 1, 'tokens': ['The', 'swift'], 'score': -7.0},
+            {'depth': 1, 'tokens': ['The', 'fast'], 'score': -6.0},
+            {'depth': 1, 'tokens': ['The', 'slow'], 'score': -8.0}
+        ]
+        self.graph.add_nodes(nodes)
+
+        n_samples = 2
+        sampled_nodes = self.graph.sample_nodes(n_samples)
+
+        self.assertEqual(len(sampled_nodes), n_samples)
+        self.assertEqual(len(self.graph.leaf_nodes), self.top_k - n_samples)
+
+    def test_print_graph(self):
+        nodes = [
+            {'depth': 1, 'tokens': ['The', 'quick'], 'score': -5.0},
+            {'depth': 1, 'tokens': ['The', 'swift'], 'score': -7.0},
+            {'depth': 1, 'tokens': ['The', 'fast'], 'score': -6.0},
+            {'depth': 1, 'tokens': ['The', 'slow'], 'score': -8.0}
+        ]
+        self.graph.add_nodes(nodes)
+
+        n_nodes = 2
+        # Redirect stdout to a buffer
+        import io
+        from contextlib import redirect_stdout
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            self.graph.print_graph(n_nodes)
+
+        # Check the printed output
+        output = buffer.getvalue()
+        self.assertIn("Best node:", output)
+        self.assertIn("Top 2 leaf nodes:", output)
+        self.assertIn("Node 1:", output)
+        self.assertIn("Node 2:", output)
 
 if __name__ == '__main__':
     unittest.main()
