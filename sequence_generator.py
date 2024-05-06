@@ -23,7 +23,10 @@ class SequenceGenerator:
         """
         Tokenizes a string using the model's tokenizer.
         """
-        return self.tokenizer(string, return_tensors="pt", padding=True, truncation=True, return_attention_mask=False)["input_ids"]
+        print(f"Input string: '{string}'")
+        tokenized_output = self.tokenizer(string, return_tensors="pt", padding=True, truncation=True, return_attention_mask=False)["input_ids"]
+        print(f"Tokenized output: {tokenized_output}")
+        return tokenized_output
     
     def decode_token_tensor(self,token_indices_tensor):
       """
