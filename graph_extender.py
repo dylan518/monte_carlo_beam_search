@@ -24,8 +24,6 @@ class GraphExtender:
         """
         token_tensor = self.sequence_generator.tokenize_string(string)
         tokens = token_tensor[0]  # Convert tensor to list of token IDs
-        if not tokens:
-            raise ValueError("The input string must not be empty.")
         self.graph_manager = BeamSearchGraph(tokens)
 
     def process_node(node, top_probs, top_indices):
