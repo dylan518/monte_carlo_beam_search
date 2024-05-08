@@ -2,6 +2,8 @@ import unittest
 import numpy as np
 from collections import OrderedDict
 from graph_manager import BeamSearchGraph
+from collections import OrderedDict
+
 
 class TestBeamSearchGraph(unittest.TestCase):
     def setUp(self):
